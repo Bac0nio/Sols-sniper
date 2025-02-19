@@ -56,6 +56,7 @@ else:
 bot = discord.Client()  # Используем discord.Client() для selfbot
 
 # Функции для проверки ключевых слов
+
 def checkForGlitch(content):
     if any(word.lower() in content.lower() for word in disallowed):
         return False
@@ -126,6 +127,10 @@ def open_link_in_thread(input_string):
     else:
         print('No valid URL found in the input string.')
 
+def check_mentions(content):
+    mention_pattern = r'@(everyone|here|&[0-9]+)'
+    return bool(re.search(mention_pattern, content))
+
 # Функция для загрузки пользовательских серверов
 def load_custom_servers():
     try:
@@ -152,12 +157,10 @@ def handle_detection_parallel(detection_type, message_content, server_name):
     print(Fore.RESET + Style.RESET_ALL)
     
     # Воспроизводим звук
-    winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS)  # Заменяем Beep на SystemExclamation
+    winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS)
 
 @bot.event
 async def on_message(message):
-    if message.author.bot:
-        return
 
     custom_servers = load_custom_servers()
 
@@ -169,11 +172,13 @@ async def on_message(message):
 
     is_custom_server = False
     use_keywords = True
+    only_ping = False
     triggers = []
     for server in custom_servers:
         if str(server['server_id']) == str(server_id) and str(channel_id) in server['channel_ids']:
             is_custom_server = True
             use_keywords = server.get('useKeywords', True)
+            only_ping = server.get('onlyPing', False)
             triggers = server.get('triggers', [])
             break
 
@@ -185,7 +190,9 @@ async def on_message(message):
 
         server_name = message.guild.name if message.guild else "DM"
 
-        # Проверка триггеров (работает всегда, независимо от useKeywords)
+        if only_ping and not check_mentions(message.content):
+            return
+
         if any(trigger.lower() in message.content.lower() for trigger in triggers):
             handle_detection_parallel("Trigger", message.content, server_name)
 
@@ -214,6 +221,7 @@ class CustomServer:
         self.channelIDs = data.get('channel_ids', []) if data else []
         self.triggers = data.get('triggers', []) if data else []
         self.useBotKeywords = data.get('useKeywords', False) if data else False
+        self.onlyPing = data.get('onlyPing', False) if data else False  # Новое поле
 
     def to_dict(self):
         return {
@@ -221,7 +229,8 @@ class CustomServer:
             'server_id': self.serverID,
             'channel_ids': self.channelIDs,
             'triggers': self.triggers,
-            'useKeywords': self.useBotKeywords
+            'useKeywords': self.useBotKeywords,
+            'onlyPing': self.onlyPing  # Новое поле
         }
 
 # Класс CustomServersGUI
@@ -305,6 +314,10 @@ class CustomServersGUI:
         self.use_keywords_check = tk.Checkbutton(self.popup_window, text="Use Keywords?", variable=self.use_keywords_var)
         self.use_keywords_check.grid(row=2, column=2, padx=10, pady=5)
 
+        self.only_ping_var = tk.BooleanVar(value=server_data.get('onlyPing', False))
+        self.only_ping_check = tk.Checkbutton(self.popup_window, text="Only Ping?", variable=self.only_ping_var)
+        self.only_ping_check.grid(row=6, column=2, padx=10, pady=5)
+
         self.channel_id_entry = tk.Entry(self.popup_window, width=20)
         self.channel_id_entry.grid(row=4, column=1, padx=10, pady=5, sticky='w')
 
@@ -342,13 +355,15 @@ class CustomServersGUI:
         channel_ids = [self.channel_ids_listbox.get(i) for i in range(self.channel_ids_listbox.size())]
         triggers = [self.triggers_listbox.get(i) for i in range(self.triggers_listbox.size())]
         use_keywords = self.use_keywords_var.get()
+        only_ping = self.only_ping_var.get()
 
         new_data = {
             'server_name': server_name,
             'server_id': server_id,
             'channel_ids': channel_ids,
             'triggers': triggers,
-            'useKeywords': use_keywords
+            'useKeywords': use_keywords,
+            'onlyPing': only_ping
         }
 
         if self.editing_index is not None:
@@ -520,7 +535,7 @@ class SniperGUI:
 
         # Первый блок: Sends you to a random public server
         self.random_server_label = tk.Label(self.hotkeys_frame, text="Sends you to a random public server", anchor='w', justify='left')
-        self.random_server_label.grid(row=1, column=0, sticky='w', padx=5, pady=2)
+        self.random_server_label.grid(row=1, column=0, sticky='w', padx=0, pady=2)
 
         self.random_server_var = tk.StringVar(value=config.get('Hotkeys', 'open_roblox', fallback='-'))
         self.random_server_dropdown = ttk.Combobox(
@@ -530,15 +545,15 @@ class SniperGUI:
             state='normal', 
             width=5
         )
-        self.random_server_dropdown.grid(row=1, column=1, sticky='w', padx=5, pady=2)
+        self.random_server_dropdown.grid(row=1, column=1, sticky='w', padx=0, pady=2)
 
         self.random_server_check_var = tk.BooleanVar(value=config.getboolean('Hotkeys', 'open_roblox_toggle', fallback=False))
         self.random_server_check = tk.Checkbutton(self.hotkeys_frame, variable=self.random_server_check_var)
-        self.random_server_check.grid(row=1, column=2, sticky='w', padx=5, pady=2)
+        self.random_server_check.grid(row=1, column=2, sticky='w', padx=0, pady=2)
 
         # Второй блок: Stop spamming and teleport to merchant
         self.stop_spam_label = tk.Label(self.hotkeys_frame, text="Stop spamming and teleport to merchant", anchor='w', justify='left')
-        self.stop_spam_label.grid(row=2, column=0, sticky='w', padx=5, pady=2)
+        self.stop_spam_label.grid(row=2, column=0, sticky='w', padx=0, pady=2)
 
         self.stop_spam_var = tk.StringVar(value=config.get('Hotkeys', 'stop_teleport', fallback='-'))
         self.stop_spam_dropdown = ttk.Combobox(
@@ -548,15 +563,15 @@ class SniperGUI:
             state='normal', 
             width=5
         )
-        self.stop_spam_dropdown.grid(row=2, column=1, sticky='w', padx=5, pady=2)
+        self.stop_spam_dropdown.grid(row=2, column=1, sticky='w', padx=0, pady=2)
 
         self.stop_spam_check_var = tk.BooleanVar(value=config.getboolean('Hotkeys', 'stop_teleport_toggle', fallback=False))
         self.stop_spam_check = tk.Checkbutton(self.hotkeys_frame, variable=self.stop_spam_check_var)
-        self.stop_spam_check.grid(row=2, column=2, sticky='w', padx=5, pady=2)
+        self.stop_spam_check.grid(row=2, column=2, sticky='w', padx=0, pady=2)
 
         # Третий блок: Stop the sniper for 2 minutes
         self.stop_sniper_label = tk.Label(self.hotkeys_frame, text="Stop the sniper for 2 minutes", anchor='w', justify='left')
-        self.stop_sniper_label.grid(row=3, column=0, sticky='w', padx=5, pady=2)
+        self.stop_sniper_label.grid(row=3, column=0, sticky='w', padx=0, pady=2)
 
         self.stop_sniper_var = tk.StringVar(value=config.get('Hotkeys', 'stop_sniper', fallback='-'))
         self.stop_sniper_dropdown = ttk.Combobox(
@@ -566,11 +581,11 @@ class SniperGUI:
             state='normal', 
             width=5
         )
-        self.stop_sniper_dropdown.grid(row=3, column=1, sticky='w', padx=5, pady=2)
+        self.stop_sniper_dropdown.grid(row=3, column=1, sticky='w', padx=0, pady=2)
 
         self.stop_sniper_check_var = tk.BooleanVar(value=config.getboolean('Hotkeys', 'stop_sniper_toggle', fallback=False))
         self.stop_sniper_check = tk.Checkbutton(self.hotkeys_frame, variable=self.stop_sniper_check_var)
-        self.stop_sniper_check.grid(row=3, column=2, sticky='w', padx=5, pady=2)
+        self.stop_sniper_check.grid(row=3, column=2, sticky='w', padx=0, pady=2)
 
     def update_hotkey(self, hotkey_name, new_hotkey):
         config['Hotkeys'][hotkey_name] = new_hotkey
