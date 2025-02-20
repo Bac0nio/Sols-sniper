@@ -1,1 +1,1 @@
-pip install tkinter colorama requests discord.py-self discord.py
+pip install tkinter colorama requests discord.py-self
