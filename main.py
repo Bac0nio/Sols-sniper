@@ -201,6 +201,10 @@ async def on_message(message):
         if only_ping and not check_mentions(message.content):
             return
 
+        if is_blocked:
+            print(f"{Fore.RED}{Style.BRIGHT}> THIS IS FROM A BLOCKED USER: {message.content}{Style.RESET_ALL}")
+            return
+
         if any(trigger.lower() in message.content.lower() for trigger in triggers):
             handle_detection_parallel("Trigger", message.content, server_name)
 
@@ -217,9 +221,6 @@ async def on_message(message):
 
             if config.getboolean('sniping', 'voidCoinsniping') and checkForCoin(message.content):
                 handle_detection_parallel("Void Coin", message.content, server_name)
-
-        if is_blocked:
-            print(f"{Fore.RED}{Style.BRIGHT}> THIS IS FROM A BLOCKED USER: {message.content}{Style.RESET_ALL}")
 
 def random_public_server():
     print("test")
