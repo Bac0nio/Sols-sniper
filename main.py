@@ -1,14 +1,19 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+import time
 import json
 import os
 import configparser
 from colorama import Fore, Style
+from pynput import keyboard
 import re
 import threading
 import requests
 import winsound
 import discord
+
+
+sniper_active = True
 
 class MewtStyle():
     MAIN = "\x1b[38;2;247;184;207m"
@@ -161,6 +166,9 @@ def handle_detection_parallel(detection_type, message_content, server_name):
 
 @bot.event
 async def on_message(message):
+    global sniper_active
+    if not sniper_active:
+        return
 
     custom_servers = load_custom_servers()
 
@@ -212,6 +220,46 @@ async def on_message(message):
 
         if is_blocked:
             print(f"{Fore.RED}{Style.BRIGHT}> THIS IS FROM A BLOCKED USER: {message.content}{Style.RESET_ALL}")
+
+def random_public_server():
+    print("test")
+
+def stop_spamming_and_teleport():
+    print("test1")
+
+def stop_sniper_for_2_minutes():
+    global sniper_active
+    sniper_active = False
+    print(f"{Fore.RED}{Style.BRIGHT}> Sniper stopped for 2 minutes{Style.RESET_ALL}")
+    time.sleep(120)
+    sniper_active = True
+    print(f"{Fore.GREEN}{Style.BRIGHT}> Sniper resumed{Style.RESET_ALL}")
+
+def on_press(key):
+    try:
+        random_server_key = config.get('Hotkeys', 'open_roblox', fallback='-').lower()
+        stop_spam_key = config.get('Hotkeys', 'stop_teleport', fallback='-').lower()
+        stop_sniper_key = config.get('Hotkeys', 'stop_sniper', fallback='-').lower()
+        
+        random_server_enabled = config.getboolean('Hotkeys', 'open_roblox_toggle', fallback=False)
+        stop_spam_enabled = config.getboolean('Hotkeys', 'stop_teleport_toggle', fallback=False)
+        stop_sniper_enabled = config.getboolean('Hotkeys', 'stop_sniper_toggle', fallback=False)
+        
+        pressed_key = key.char.lower() if hasattr(key, 'char') else None
+        
+        if pressed_key == stop_sniper_key and sniper_active and stop_sniper_enabled:
+            threading.Thread(target=stop_sniper_for_2_minutes).start()
+        
+        if pressed_key == random_server_key and random_server_enabled:
+            random_public_server()
+        
+        if pressed_key == stop_spam_key and stop_spam_enabled:
+            stop_spamming_and_teleport()
+    except AttributeError:
+        pass
+
+keyboard_listener = keyboard.Listener(on_press=on_press)
+keyboard_listener.start()
 
 # Класс CustomServer
 class CustomServer:
